@@ -18,7 +18,7 @@ int main(int argc, char* argv[])
     thread_pool = new pthread_t[thread_count*sizeof(pthread_t)];
     pthread_mutex_init(&mutex, NULL);
     pthread_cond_init(&cond_var, NULL);
-
+    counter=0;
     double startTime, endTime;
 
     startTime = omp_get_wtime();

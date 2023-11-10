@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
 
     thread_count = strtol(argv[1],NULL,10);
     thread_pool = new pthread_t[thread_count*sizeof(pthread_t)];
-
+    counter=0;
     double startTime, endTime;
 
     startTime = omp_get_wtime();
