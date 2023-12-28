@@ -5,34 +5,33 @@
 
 #define BLUR_SIZE 3
 #define CHANNELS 3
+#define uc unsigned char
 
 using namespace cv;
 
 __global__
-void colorToBlurConversion(unsigned char* in, unsigned char* out, int w, int h) {
-    int Col = blockIdx.x * blockDim.x + threadIdx.x;
-    int Row = blockIdx.y * blockDim.y + threadIdx.y;
+void colorToGreyscaleConversion(uc* Pout, unsigned
+	char* Pin, int width, int height) {
+	
+	int Col = threadIdx.x + blockIdx.x * blockDim.x;
+	int Row = threadIdx.y + blockIdx.y * blockDim.y;
+	if (Col < width && Row < height) {
+		// get 1D coordinate for the grayscale image
+		int greyOffset = Row * width + Col;
+		// one can think of the RGB image having
+		// CHANNEL times columns than the grayscale image
+		int rgbOffset = greyOffset * CHANNELS;
+		uc r = Pin[rgbOffset]; // red value for pixel
+		uc g = Pin[rgbOffset + 1]; // green value for pixel
+		uc b = Pin[rgbOffset + 2]; // blue value for pixel
+		// perform the rescaling and store it
+		// We multiply by floating point constants
+		Pout[rgbOffset] = 0.21f * r + 0.71f * g + 0.07f * b;
+		Pout[rgbOffset+1] = 0.21f * r + 0.71f * g + 0.07f * b;
+		Pout[rgbOffset+2] = 0.21f * r + 0.71f * g + 0.07f * b;
+		
 
-    if (Col < w && Row < h) {
-        int pixVal = 0;
-        int pixels = 0;
-
-        for (int blurRow = -BLUR_SIZE; blurRow < BLUR_SIZE + 1; ++blurRow) {
-            for (int blurCol = -BLUR_SIZE; blurCol < BLUR_SIZE + 1; ++blurCol) {
-                int curRow = Row + blurRow;
-                int curCol = Col + blurCol;
-
-                if (curRow > -1 && curRow < h && curCol > -1 && curCol < w) {
-                    pixVal += in[(curRow * w + curCol) * CHANNELS];
-                    pixels++;
-                }
-            }
-        }
-
-        out[(Row * w + Col) * CHANNELS] = (unsigned char)(pixVal / pixels);
-        out[(Row * w + Col) * CHANNELS + 1] = (unsigned char)(pixVal / pixels);
-        out[(Row * w + Col) * CHANNELS + 2] = (unsigned char)(pixVal / pixels);
-    }
+	}
 }
 
 int main(int argc, char** argv) {
@@ -59,8 +58,8 @@ int main(int argc, char** argv) {
 
     std::cout<<width<<" "<<height<<"\n";
 
-    unsigned char* ptrImageData = NULL;
-    unsigned char* ptrImageDataOut = NULL;
+    uc* ptrImageData = NULL;
+    uc* ptrImageDataOut = NULL;
 
     cudaMalloc(&ptrImageDataOut, width * height * CHANNELS);
     cudaMalloc(&ptrImageData, width * height * CHANNELS);
@@ -69,14 +68,14 @@ int main(int argc, char** argv) {
     dim3 dimGrid(ceil(width / 16.0), ceil(height / 16.0), 1);
     dim3 dimBlock(16, 16, 1);
 
-    colorToBlurConversion<<<dimGrid, dimBlock>>>(ptrImageDataOut, ptrImageData, width, height);
+    colorToGreyscaleConversion<<<dimGrid, dimBlock>>>(ptrImageDataOut, ptrImageData, width, height);
     cudaDeviceSynchronize(); // Esperar a que todos los bloques terminen
 
     Mat image2(height, width, CV_8UC3);
     cudaMemcpy(image2.data, ptrImageDataOut, width * height * CHANNELS, cudaMemcpyDeviceToHost);
 
     std::string nuevoNombre = argv[1];
-    nuevoNombre = nuevoNombre.substr(0, nuevoNombre.find_last_of('.')) + "_toBlur.jpeg";
+    nuevoNombre = nuevoNombre.substr(0, nuevoNombre.find_last_of('.')) + "toGray.png";
     imwrite(nuevoNombre, image2);
 
     cudaFree(ptrImageData);
